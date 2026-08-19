@@ -1,0 +1,120 @@
+{
+  "doc_ids": [
+    "msmarco_doc_001_semantic_0_c6b4ae5dae8a",
+    "msmarco_doc_002_semantic_0_490d98f8890c",
+    "msmarco_doc_003_semantic_0_6c7519a900a2",
+    "msmarco_doc_004_semantic_0_0af273aafb04",
+    "msmarco_doc_005_semantic_0_46a41eb5449e",
+    "msmarco_doc_006_semantic_0_721ebba2a95f",
+    "msmarco_doc_007_semantic_0_177cff5d5207",
+    "msmarco_doc_008_semantic_0_398403b48500"
+  ],
+  "texts": [
+    "Machine learning is a subfield of artificial intelligence focused on building applications that learn from data and improve their accuracy over time without being explicitly programmed. Deep neural networks consist of multiple layers of interconnected nodes that model complex non-linear relationships in massive datasets.",
+    "Speech-to-text (STT) converts spoken acoustic audio waves into digital text transcripts using acoustic modeling, language modeling, and deep transformer architectures. Modern STT services like Sarvam AI support multilingual speech recognition tailored specifically for Indic and English accents with low latency.",
+    "Hybrid retrieval combines dense semantic vector embeddings with sparse lexical BM25 algorithms. Reciprocal Rank Fusion (RRF) scores items by their reciprocal rank across both systems: RRF_score = sum(1.0 / (k + rank)). This merges semantic similarity with exact keyword precision.",
+    "To achieve sub-200ms latency in online RAG pipelines, engineers decouple dense and sparse retrieval using asynchronous parallel execution, apply lightweight vector approximations, prune candidate sets before reranking, and utilize fast streaming LLM decoders.",
+    "भारत में कृत्रिम बुद्धिमत्ता (AI) और भाषा प्रौद्योगिकियों का तेजी से विकास हो रहा है। AI4Bharat और सर्वम एआई जैसी पहलें भारतीय भाषाओं के लिए विशेष रूप से उन्नत ओपन-सोर्स मॉडल और वाक्-से-पाठ (STT) प्रणालियाँ तैयार कर रही हैं।",
+    "Solar photovoltaic cells convert sunlight directly into electricity using semiconductor materials like silicon. Modern bifacial solar panels capture irradiance from both sides, increasing energy yield by up to 25 percent compared to traditional monofacial arrays.",
+    "Microservice architecture decomposes monolithic systems into autonomous, independently deployable services communicating over lightweight APIs or gRPC. Containerization with Docker and orchestration with Kubernetes enable resilient scaling and high availability.",
+    "The MS MARCO (Microsoft Machine Reading Comprehension) dataset is a large-scale collection of real search queries from Bing with human-annotated answers and passages. MSMARCO-XI extends this benchmark to Indian and multilingual domains for robust cross-lingual evaluation."
+  ],
+  "metadatas": [
+    {
+      "chunk_id": "msmarco_doc_001_semantic_0_c6b4ae5dae8a",
+      "document_id": "msmarco_doc_001",
+      "strategy": "semantic",
+      "language": "en",
+      "token_count": 44,
+      "parent_id": null,
+      "title": "Machine Learning and Neural Networks Overview",
+      "url": "https://microsoft.github.io/msmarco/",
+      "source": "MSMARCO-XI",
+      "domain": "open_domain"
+    },
+    {
+      "chunk_id": "msmarco_doc_002_semantic_0_490d98f8890c",
+      "document_id": "msmarco_doc_002",
+      "strategy": "semantic",
+      "language": "en",
+      "token_count": 40,
+      "parent_id": null,
+      "title": "Voice Recognition and Speech-to-Text Architecture",
+      "url": "https://sarvam.ai/docs",
+      "source": "MSMARCO-XI",
+      "domain": "open_domain"
+    },
+    {
+      "chunk_id": "msmarco_doc_003_semantic_0_6c7519a900a2",
+      "document_id": "msmarco_doc_003",
+      "strategy": "semantic",
+      "language": "en",
+      "token_count": 40,
+      "parent_id": null,
+      "title": "Hybrid Retrieval and Reciprocal Rank Fusion",
+      "url": "https://ir-benchmarks.ai/hybrid-rag",
+      "source": "MSMARCO-XI",
+      "domain": "open_domain"
+    },
+    {
+      "chunk_id": "msmarco_doc_004_semantic_0_0af273aafb04",
+      "document_id": "msmarco_doc_004",
+      "strategy": "semantic",
+      "language": "en",
+      "token_count": 33,
+      "parent_id": null,
+      "title": "Retrieval Augmented Generation Latency Optimization",
+      "url": "https://latency-optimization.ai/sub200ms",
+      "source": "MSMARCO-XI",
+      "domain": "open_domain"
+    },
+    {
+      "chunk_id": "msmarco_doc_005_semantic_0_46a41eb5449e",
+      "document_id": "msmarco_doc_005",
+      "strategy": "semantic",
+      "language": "hi",
+      "token_count": 39,
+      "parent_id": null,
+      "title": "Artificial Intelligence in India (हिंदी - कृत्रिम बुद्धिमत्ता)",
+      "url": "https://ai4bharat.iitm.ac.in",
+      "source": "MSMARCO-XI",
+      "domain": "open_domain"
+    },
+    {
+      "chunk_id": "msmarco_doc_006_semantic_0_721ebba2a95f",
+      "document_id": "msmarco_doc_006",
+      "strategy": "semantic",
+      "language": "en",
+      "token_count": 35,
+      "parent_id": null,
+      "title": "Renewable Energy and Solar Photovoltaic Systems",
+      "url": "https://energy-research.org/solar-pv",
+      "source": "MSMARCO-XI",
+      "domain": "open_domain"
+    },
+    {
+      "chunk_id": "msmarco_doc_007_semantic_0_177cff5d5207",
+      "document_id": "msmarco_doc_007",
+      "strategy": "semantic",
+      "language": "en",
+      "token_count": 29,
+      "parent_id": null,
+      "title": "Cloud Computing and Distributed Microservices",
+      "url": "https://cloud-architecture-guide.org/microservices",
+      "source": "MSMARCO-XI",
+      "domain": "open_domain"
+    },
+    {
+      "chunk_id": "msmarco_doc_008_semantic_0_398403b48500",
+      "document_id": "msmarco_doc_008",
+      "strategy": "semantic",
+      "language": "en",
+      "token_count": 36,
+      "parent_id": null,
+      "title": "Information Retrieval Benchmarks: MS MARCO",
+      "url": "https://microsoft.github.io/msmarco/",
+      "source": "MSMARCO-XI",
+      "domain": "open_domain"
+    }
+  ]
+}
