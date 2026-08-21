@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
-import requests
+import time
+import httpx
 
 from models.schemas import SearchResultItem
 from services.config import get_settings
@@ -11,12 +11,17 @@ from services.exceptions import ConfigurationError, ExternalServiceError
 
 logger = logging.getLogger(__name__)
 
-NO_EVIDENCE_ANSWER = "I could not find sufficient evidence in the retrieved knowledge base to answer your question."
+NO_EVIDENCE_ANSWER = (
+    "I could not find sufficient evidence in the retrieved knowledge base to answer your question."
+)
 
 
 class LLMService:
     def __init__(self) -> None:
-        self._session = requests.Session()
+        self._client = httpx.AsyncClient()
+
+    async def close(self) -> None:
+        await self._client.aclose()
 
     async def answer_from_context(
         self,
@@ -28,10 +33,9 @@ class LLMService:
             return NO_EVIDENCE_ANSWER
 
         settings = get_settings()
+        logger.info("Generating answer with Groq model: %s", settings.groq_model)
         prompt = self._build_prompt(query=query, documents=documents)
         instructions = system_instructions or self._default_instructions()
-        
-        logger.info("Generating answer with Gemini model %s", settings.gemini_model)
         answer = await self._generate_text(instructions=instructions, prompt=prompt)
         return answer.strip() or NO_EVIDENCE_ANSWER
 
@@ -42,53 +46,72 @@ class LLMService:
         temperature: float = 0.2,
     ) -> str:
         settings = get_settings()
-        if not settings.gemini_api_key:
-            raise ConfigurationError("GEMINI_API_KEY must be set in backend/.env.")
+        if not settings.groq_api_key:
+            raise ConfigurationError("GROQ_API_KEY must be set in backend/.env.")
 
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{settings.gemini_model}:generateContent"
-        )
-        payload = {
-            "systemInstruction": {"parts": [{"text": instructions}]},
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": temperature},
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {settings.groq_api_key}",
+            "Content-Type": "application/json",
         }
-        params = {"key": settings.gemini_api_key}
+        payload = {
+            "model": settings.groq_model,
+            "messages": [
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": temperature,
+            "max_tokens": 512,
+        }
 
-        try:
-            response = await asyncio.to_thread(
-                self._session.post,
-                url,
-                params=params,
-                json=payload,
-                timeout=settings.gemini_timeout_seconds,
-            )
-            response.raise_for_status()
-        except requests.RequestException as exc:
-            detail = getattr(exc.response, "text", "") if getattr(exc, "response", None) else ""
-            message = f"Gemini request failed: {exc}"
-            if detail:
-                message = f"{message}. {detail[:500]}"
-            raise ExternalServiceError(message) from exc
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                t0 = time.time()
+                logger.debug("POST %s model=%s attempt=%d", url, settings.groq_model, attempt + 1)
+
+                response = await self._client.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                    timeout=settings.groq_timeout_seconds,
+                )
+
+                elapsed_ms = (time.time() - t0) * 1000
+                logger.info("Groq response: %.1fms (status=%d)", elapsed_ms, response.status_code)
+
+                response.raise_for_status()
+                break
+
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 429 and attempt < max_retries - 1:
+                    wait = 3 + attempt * 2
+                    logger.warning("Groq rate limit (429). Retrying in %ds...", wait)
+                    await asyncio.sleep(wait)
+                    continue
+                detail = exc.response.text
+                raise ExternalServiceError(
+                    f"Groq request failed ({exc.response.status_code}): {detail[:400]}"
+                ) from exc
+            except httpx.RequestError as exc:
+                raise ExternalServiceError(f"Groq network error: {exc}") from exc
 
         try:
             data = response.json()
         except ValueError as exc:
-            raise ExternalServiceError("Gemini returned a non-JSON response.") from exc
+            raise ExternalServiceError("Groq returned non-JSON response.") from exc
 
-        candidates = data.get("candidates") or [{}]
-        parts = candidates[0].get("content", {}).get("parts", [])
-        text = "".join(str(part.get("text", "")) for part in parts)
-        return text.strip()
+        choices = data.get("choices") or [{}]
+        content = choices[0].get("message", {}).get("content", "")
+        return content.strip()
 
     @staticmethod
     def _default_instructions() -> str:
         return (
-            "You are a helpful, accurate voice assistant powered by retrieved knowledge. "
-            "Answer the user's question directly, clearly, and concisely based strictly on the provided context passages. "
-            f"If the context does not contain enough evidence, state: '{NO_EVIDENCE_ANSWER}' "
-            "Do not make up facts or hallucinate beyond what is supported by the context."
+            "You are a concise, accurate voice assistant powered by retrieved knowledge. "
+            "Answer the user's question directly and briefly based strictly on the provided context. "
+            f"If the context lacks sufficient evidence, respond: '{NO_EVIDENCE_ANSWER}' "
+            "Do not fabricate facts. Keep answers short (2-4 sentences max)."
         )
 
     @staticmethod
@@ -97,11 +120,8 @@ class LLMService:
         sections: list[str] = []
         used_chars = 0
 
-        for index, document in enumerate(documents, start=1):
-            section = (
-                f"[Source {index}] (ID: {document.id})\n"
-                f"{document.text}\n"
-            )
+        for index, doc in enumerate(documents, start=1):
+            section = f"[Source {index}] (ID: {doc.id})\n{doc.text}\n"
             if used_chars + len(section) > max_context_chars:
                 remaining = max_context_chars - used_chars
                 if remaining > 200:
@@ -111,4 +131,4 @@ class LLMService:
             used_chars += len(section)
 
         context = "\n---\n".join(sections)
-        return f"User Question: {query}\n\nRetrieved Context Passages:\n{context}\n\nAnswer:"
+        return f"User Question: {query}\n\nRetrieved Context:\n{context}\n\nAnswer:"

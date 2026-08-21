@@ -90,7 +90,22 @@ class HybridRetriever:
             elapsed = (time.perf_counter_ns() - t0) / 1_000_000
             return res, elapsed
 
-        (dense_results, dense_time), (bm25_results, bm25_time) = await asyncio.gather(run_dense(), run_bm25())
+        import logging
+        logger = logging.getLogger(__name__)
+
+        results = await asyncio.gather(run_dense(), run_bm25(), return_exceptions=True)
+
+        dense_results, dense_time = [], 0.0
+        if isinstance(results[0], Exception):
+            logger.warning("Dense search failed: %s", results[0])
+        else:
+            dense_results, dense_time = results[0]
+
+        bm25_results, bm25_time = [], 0.0
+        if isinstance(results[1], Exception):
+            logger.warning("BM25 search failed: %s", results[1])
+        else:
+            bm25_results, bm25_time = results[1]
 
         timing.vector_search_ms = round(dense_time, 3)
         timing.bm25_search_ms = round(bm25_time, 3)

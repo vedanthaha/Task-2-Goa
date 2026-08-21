@@ -16,7 +16,6 @@ export default function VoiceRAGPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
-    isRecording,
     analyserNode,
     audioLevel,
     hasSpoken,
@@ -26,7 +25,6 @@ export default function VoiceRAGPage() {
     error: recorderError,
   } = useVoiceRecorder();
 
-  // Process voice audio blob
   const processAudioBlob = async (blob: Blob) => {
     setState("transcribing");
     try {
@@ -35,45 +33,29 @@ export default function VoiceRAGPage() {
       setQueryResponse(resp);
       setState("complete");
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Voice query failed. Please check microphone or use text fallback.";
-      setErrorMessage(msg);
+      setErrorMessage(err instanceof Error ? err.message : "Voice query failed.");
       setState("error");
     }
   };
 
-  // Voice Interaction Handlers
   const handleStartListening = async () => {
     setErrorMessage(null);
     setState("listening");
-    // Pass auto-stop callback: triggers automatically when speech finishes and silence is detected
-    await startRecording(async (autoBlob: Blob) => {
-      await processAudioBlob(autoBlob);
-    });
+    await startRecording(async (blob: Blob) => { await processAudioBlob(blob); });
   };
 
   const handleStopListening = async () => {
     setState("transcribing");
     try {
-      const audioBlob = await stopRecording();
-      if (!audioBlob || audioBlob.size === 0) {
-        setState("idle");
-        return;
-      }
-      await processAudioBlob(audioBlob);
+      const blob = await stopRecording();
+      if (!blob || blob.size === 0) { setState("idle"); return; }
+      await processAudioBlob(blob);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Voice query failed. Please check microphone or use text fallback.";
-      setErrorMessage(msg);
+      setErrorMessage(err instanceof Error ? err.message : "Voice query failed.");
       setState("error");
     }
   };
 
-  // Text Fallback Handler
   const handleTextSubmit = async (text: string) => {
     setErrorMessage(null);
     setState("retrieving");
@@ -82,11 +64,7 @@ export default function VoiceRAGPage() {
       setQueryResponse(resp);
       setState("complete");
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Text query failed. Please check backend connection.";
-      setErrorMessage(msg);
+      setErrorMessage(err instanceof Error ? err.message : "Query failed.");
       setState("error");
     }
   };
@@ -98,26 +76,36 @@ export default function VoiceRAGPage() {
     resetRecording();
   };
 
+  const isBusy = ["listening","transcribing","retrieving","generating"].includes(state);
+  const showHero = state === "idle" && !queryResponse;
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-300">
+    <div className="page-bg" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <AppHeader />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col items-center">
-        {/* Hero title */}
-        <div className="text-center space-y-2 mb-8 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-1">
-            <span>●</span> MSMARCO-XI Multilingual Knowledge Base
-          </div>
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-slate-100 font-sans">
-            Fast Voice-Enabled RAG Search
-          </h1>
-          <p className="text-sm text-slate-400 font-sans leading-relaxed">
-            Speak in Indian languages or English. Powered by Sarvam Speech-to-Text, parallel hybrid retrieval (Dense + BM25), and sub-200ms grounded generation.
-          </p>
-        </div>
+      <main style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",     /* centres children horizontally */
+        justifyContent: "flex-start",
+        padding: "24px 24px 40px",
+        width: "100%",
+      }}>
+        {/* Inner container — fixed width, centred */}
+        <div style={{ width: "100%", maxWidth: 620 }}>
 
-        {/* Voice Interface Card */}
-        <div className="w-full max-w-2xl">
+          {/* Hero — only when idle */}
+          {showHero && (
+            <div className="fade-up" style={{ textAlign: "center", marginBottom: 40 }}>
+              <h1 style={{ fontSize: "clamp(32px, 6vw, 48px)", fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1.2, color: "#e2e8f0", marginBottom: 12 }}>
+                Talk to HH Goa AI –<br />
+                <span style={{ color: "#94a3b8" }}>Smarter, Faster, Better</span>
+              </h1>
+            </div>
+          )}
+
+          {/* Voice interface */}
           <VoiceInterface
             state={state}
             analyserNode={analyserNode}
@@ -129,25 +117,24 @@ export default function VoiceRAGPage() {
             onStopListening={handleStopListening}
             errorMessage={errorMessage || recorderError}
           />
-        </div>
 
-        {/* Text Input Fallback */}
-        <div className="w-full max-w-2xl">
-          <TextInputFallback
-            onSubmit={handleTextSubmit}
-            disabled={state === "listening" || state === "transcribing" || state === "retrieving" || state === "generating"}
-          />
-        </div>
+          {/* Or type divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0 16px" }}>
+            <hr className="divider" />
+            <span style={{ fontSize: 11, color: "#555", fontFamily: "var(--font-mono), monospace", flexShrink: 0 }}>or type</span>
+            <hr className="divider" />
+          </div>
 
-        {/* Response View */}
-        <div className="w-full max-w-3xl">
+          {/* Text input */}
+          <TextInputFallback onSubmit={handleTextSubmit} disabled={isBusy} />
+
+          {/* Response */}
           <ResponseView response={queryResponse} onClear={handleClear} />
         </div>
       </main>
 
-      {/* Minimal Footer */}
-      <footer className="w-full border-t border-slate-800/60 py-6 text-center text-xs font-mono text-slate-400">
-        HH Goa 2026 • Task 2 Voice-Enabled RAG • Sarvam STT • MSMARCO-XI • Sub-200ms Latency SLA
+      <footer style={{ textAlign: "center", padding: "24px 0", fontSize: 10, fontFamily: "var(--font-mono), monospace", color: "#333", letterSpacing: "0.1em" }}>
+        HH GOA 2026 · TASK 2 · VOICE-ENABLED RAG
       </footer>
     </div>
   );

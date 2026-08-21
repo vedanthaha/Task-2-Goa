@@ -11,83 +11,50 @@ export function AppHeader() {
 
   useEffect(() => {
     fetchHealth()
-      .then((res) => setIsHealthy(res.status === "ok"))
+      .then((r) => setIsHealthy(r.status === "ok"))
       .catch(() => setIsHealthy(false));
   }, []);
 
   return (
-    <header className="w-full border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-xl sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        {/* Brand identity */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-            <svg
-              className="w-5 h-5 text-slate-950 fill-current"
-              viewBox="0 0 24 24"
-            >
+    <header className="app-header">
+      <div className="app-header-inner">
+        {/* Logo */}
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 8,
+            background: "linear-gradient(135deg, #7c5ff7, #5f5ce8)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 12px rgba(124,95,247,0.3)"
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
               <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
               <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
             </svg>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-100 tracking-tight text-base">
-                HH Goa RAG
-              </span>
-              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Task 2
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 font-sans">
-              Multilingual Voice-Enabled RAG
-            </p>
-          </div>
+          <span style={{ fontWeight: 600, color: "#f0f0f0", fontSize: 14, letterSpacing: "-0.02em" }}>
+            Voice RAG
+          </span>
+          <span className="badge badge-purple">HH Goa 2026</span>
         </Link>
 
-        {/* Navigation & Status Beacon */}
-        <div className="flex items-center gap-4">
-          <nav className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 text-sm">
-            <Link
-              href="/"
-              className={`px-3.5 py-1.5 rounded-lg font-medium transition-all ${
-                pathname === "/"
-                  ? "bg-slate-800 text-slate-100 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Voice Search
-            </Link>
-            <Link
-              href="/benchmark"
-              className={`px-3.5 py-1.5 rounded-lg font-medium transition-all ${
-                pathname === "/benchmark"
-                  ? "bg-slate-800 text-slate-100 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Benchmark & SLA
-            </Link>
-          </nav>
+        {/* Nav */}
+        <nav style={{ display: "flex", gap: 2 }}>
+          <Link href="/" className={`nav-link ${pathname === "/" ? "active" : ""}`}>
+            Search
+          </Link>
+          <Link href="/benchmark" className={`nav-link ${pathname === "/benchmark" ? "active" : ""}`}>
+            Benchmark
+          </Link>
+        </nav>
 
-          {/* System Status Pill */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isHealthy === true
-                  ? "bg-emerald-400 shadow-[0_0_8px_#34d399]"
-                  : isHealthy === false
-                  ? "bg-amber-400 shadow-[0_0_8px_#fbbf24]"
-                  : "bg-slate-500 animate-pulse"
-              }`}
-            />
-            <span className="text-slate-300">
-              {isHealthy === true
-                ? "System Ready"
-                : isHealthy === false
-                ? "Offline Mode"
-                : "Connecting..."}
-            </span>
-          </div>
+        {/* Status */}
+        <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#666" }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: "50%", display: "inline-block",
+            background: isHealthy === true ? "#4ade80" : isHealthy === false ? "#f87171" : "#555",
+            boxShadow: isHealthy === true ? "0 0 6px #4ade80" : isHealthy === false ? "0 0 6px #f87171" : "none",
+          }} />
+          {isHealthy === true ? "API Ready" : isHealthy === false ? "Offline" : "Connecting…"}
         </div>
       </div>
     </header>

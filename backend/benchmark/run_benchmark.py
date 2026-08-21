@@ -37,6 +37,10 @@ def calc_percentiles(values: list[float]) -> dict[str, float]:
     }
 
 
+import httpx
+from app import app
+from rag.orchestrator import orchestrator
+
 async def run_full_benchmark(
     output_dir: Path | str | None = None,
     iterations: int = 1,
@@ -44,106 +48,125 @@ async def run_full_benchmark(
     out_path = Path(output_dir or BASE_DIR.parent / "results")
     out_path.mkdir(parents=True, exist_ok=True)
 
-    orchestrator = RAGOrchestrator()
-
     logger.info("=== INITIALIZING HH GOA 2026 BENCHMARK SUITE ===")
     logger.info("Total Queries: %d | Output Directory: %s", len(BENCHMARK_QUERIES), out_path)
 
-    # 1. Warmup
-    logger.info("Executing warmup pass...")
-    for q in BENCHMARK_QUERIES[:5]:
-        await orchestrator.execute_query(q.query, top_k=5, use_cache=False)
-    orchestrator.retriever.clear_cache()
-    logger.info("Warmup complete.")
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Warmup
+        logger.info("Executing warmup pass...")
+        for q in BENCHMARK_QUERIES[:5]:
+            await client.post("/api/rag/query", json={"query": q.query, "top_k": 5})
+        orchestrator.retriever.clear_cache()
+        logger.info("Warmup complete.")
 
-    # 2. Main Benchmark Run (Adaptive Reranking)
-    query_records: list[dict[str, Any]] = []
-    stage_timings: dict[str, list[float]] = {
-        "query_processing": [],
-        "query_embedding": [],
-        "vector_search": [],
-        "bm25_search": [],
-        "hybrid_fusion": [],
-        "reranking": [],
-        "prompt_construction": [],
-        "generation": [],
-        "grounding": [],
-        "total_pipeline": [],
-    }
+        # 2. Main Benchmark Run
+        query_records: list[dict[str, Any]] = []
+        stage_timings: dict[str, list[float]] = {
+            "query_processing": [],
+            "query_embedding": [],
+            "vector_search": [],
+            "bm25_search": [],
+            "hybrid_fusion": [],
+            "reranking": [],
+            "prompt_construction": [],
+            "generation": [],
+            "grounding": [],
+            "total_pipeline": [],
+            "end_to_end": [],
+        }
 
-    category_latencies: dict[str, list[float]] = {cat.value: [] for cat in QueryCategory}
-    category_accuracies: dict[str, list[bool]] = {cat.value: [] for cat in QueryCategory}
+        category_latencies: dict[str, list[float]] = {cat.value: [] for cat in QueryCategory}
+        category_accuracies: dict[str, list[bool]] = {cat.value: [] for cat in QueryCategory}
 
-    logger.info("Executing benchmark evaluation across all 105 queries...")
-    for q_item in BENCHMARK_QUERIES:
-        # Run query with cold cache for first measure
-        resp = await orchestrator.execute_query(q_item.query, top_k=5, use_cache=False, rerank_mode="adaptive")
+        logger.info("Executing benchmark evaluation across all 105 queries...")
+        for q_item in BENCHMARK_QUERIES:
+            t0 = time.perf_counter()
+            resp = await client.post("/api/rag/query", json={"query": q_item.query, "top_k": 5})
+            e2e_ms = (time.perf_counter() - t0) * 1000
+            data = resp.json()
 
-        lat = resp.latency
-        stage_timings["query_processing"].append(lat.query_processing_ms)
-        stage_timings["query_embedding"].append(lat.query_embedding_ms)
-        stage_timings["vector_search"].append(lat.vector_search_ms)
-        stage_timings["bm25_search"].append(lat.bm25_search_ms)
-        stage_timings["hybrid_fusion"].append(lat.hybrid_fusion_ms)
-        stage_timings["reranking"].append(lat.reranking_ms)
-        stage_timings["prompt_construction"].append(lat.prompt_construction_ms)
-        stage_timings["generation"].append(lat.generation_ms)
-        stage_timings["grounding"].append(lat.grounding_ms)
-        stage_timings["total_pipeline"].append(lat.total_pipeline_ms)
+            lat = data.get("latency", {})
+            guard = data.get("guardrails", {})
+            cits = data.get("citations", [])
+            ans = data.get("answer", "")
 
-        category_latencies[q_item.category.value].append(lat.total_pipeline_ms)
+            stage_timings["query_processing"].append(lat.get("query_processing_ms", 0))
+            stage_timings["query_embedding"].append(lat.get("query_embedding_ms", 0))
+            stage_timings["vector_search"].append(lat.get("vector_search_ms", 0))
+            stage_timings["bm25_search"].append(lat.get("bm25_search_ms", 0))
+            stage_timings["hybrid_fusion"].append(lat.get("hybrid_fusion_ms", 0))
+            stage_timings["reranking"].append(lat.get("reranking_ms", 0))
+            stage_timings["prompt_construction"].append(lat.get("prompt_construction_ms", 0))
+            stage_timings["generation"].append(lat.get("generation_ms", 0))
+            stage_timings["grounding"].append(lat.get("grounding_ms", 0))
+            stage_timings["total_pipeline"].append(lat.get("total_pipeline_ms", 0))
+            stage_timings["end_to_end"].append(e2e_ms)
 
-        # Accuracy check
-        if q_item.category == QueryCategory.ADVERSARIAL:
-            correct = resp.guardrails.prompt_injection_detected or not resp.guardrails.is_safe
-        elif q_item.category == QueryCategory.NO_CONTEXT:
-            correct = not resp.guardrails.is_on_topic or len(resp.citations) == 0 or "could not find" in resp.answer.lower()
-        else:
-            correct = len(resp.citations) > 0 and resp.guardrails.is_safe
+            category_latencies[q_item.category.value].append(e2e_ms)
 
-        category_accuracies[q_item.category.value].append(correct)
+            # Accuracy check
+            is_safe = guard.get("is_safe", True)
+            on_topic = guard.get("is_on_topic", True)
+            prompt_inj = guard.get("prompt_injection_detected", False)
+            
+            if q_item.category == QueryCategory.ADVERSARIAL:
+                correct = prompt_inj or not is_safe
+            elif q_item.category == QueryCategory.NO_CONTEXT:
+                correct = not on_topic or len(cits) == 0 or "could not find" in ans.lower()
+            else:
+                correct = len(cits) > 0 and is_safe
 
-        query_records.append({
-            "id": q_item.id,
-            "category": q_item.category.value,
-            "language": q_item.language,
-            "query": q_item.query,
-            "answer_preview": resp.answer[:120].replace("\n", " "),
-            "citations_count": len(resp.citations),
-            "is_safe": resp.guardrails.is_safe,
-            "is_on_topic": resp.guardrails.is_on_topic,
-            "prompt_injection": resp.guardrails.prompt_injection_detected,
-            "grounding_score": resp.guardrails.grounding_score,
-            "confidence_score": resp.guardrails.confidence_score,
-            "query_processing_ms": lat.query_processing_ms,
-            "vector_search_ms": lat.vector_search_ms,
-            "bm25_search_ms": lat.bm25_search_ms,
-            "hybrid_fusion_ms": lat.hybrid_fusion_ms,
-            "reranking_ms": lat.reranking_ms,
-            "generation_ms": lat.generation_ms,
-            "grounding_ms": lat.grounding_ms,
-            "total_ms": lat.total_pipeline_ms,
-        })
+            category_accuracies[q_item.category.value].append(correct)
 
-    # 3. Reranker Comparison Study (No Rerank vs Always Rerank vs Adaptive)
-    logger.info("Executing Reranker Comparison Study...")
-    no_rerank_totals = []
-    always_rerank_totals = []
-    cached_totals = []
+            query_records.append({
+                "id": q_item.id,
+                "category": q_item.category.value,
+                "language": q_item.language,
+                "query": q_item.query,
+                "answer_preview": ans[:120].replace("\n", " "),
+                "citations_count": len(cits),
+                "is_safe": is_safe,
+                "is_on_topic": on_topic,
+                "prompt_injection": prompt_inj,
+                "grounding_score": guard.get("grounding_score", 0),
+                "confidence_score": guard.get("confidence_score", 0),
+                "query_processing_ms": lat.get("query_processing_ms", 0),
+                "vector_search_ms": lat.get("vector_search_ms", 0),
+                "bm25_search_ms": lat.get("bm25_search_ms", 0),
+                "hybrid_fusion_ms": lat.get("hybrid_fusion_ms", 0),
+                "reranking_ms": lat.get("reranking_ms", 0),
+                "generation_ms": lat.get("generation_ms", 0),
+                "grounding_ms": lat.get("grounding_ms", 0),
+                "total_ms": lat.get("total_pipeline_ms", 0),
+                "end_to_end_ms": e2e_ms,
+            })
+            # Sleep to avoid Groq rate limit (8000 TPM)
+            await asyncio.sleep(4.0)
 
-    for q_item in BENCHMARK_QUERIES[:30]:
-        r_none = await orchestrator.execute_query(q_item.query, top_k=5, use_cache=False, rerank_mode="none")
-        no_rerank_totals.append(r_none.latency.total_pipeline_ms)
+        # 3. Reranker Comparison Study
+        logger.info("Executing Reranker Comparison Study...")
+        no_rerank_totals = []
+        always_rerank_totals = []
+        cached_totals = []
 
-        r_always = await orchestrator.execute_query(q_item.query, top_k=5, use_cache=False, rerank_mode="always")
-        always_rerank_totals.append(r_always.latency.total_pipeline_ms)
+        for q_item in BENCHMARK_QUERIES[:30]:
+            # Note: For full E2E, we'd need to modify the API to accept rerank_mode. 
+            # We'll approximate by directly calling the orchestrator for this specific ablation study.
+            r_none = await orchestrator.execute_query(q_item.query, top_k=5, use_cache=False, rerank_mode="none")
+            no_rerank_totals.append(r_none.latency.total_pipeline_ms)
+            await asyncio.sleep(4.0)
 
-        # Cached query run
-        r_cached = await orchestrator.execute_query(q_item.query, top_k=5, use_cache=True, rerank_mode="adaptive")
-        cached_totals.append(r_cached.latency.total_pipeline_ms)
+            r_always = await orchestrator.execute_query(q_item.query, top_k=5, use_cache=False, rerank_mode="always")
+            always_rerank_totals.append(r_always.latency.total_pipeline_ms)
+            await asyncio.sleep(4.0)
+
+            # Cached query run
+            r_cached = await orchestrator.execute_query(q_item.query, top_k=5, use_cache=True, rerank_mode="adaptive")
+            cached_totals.append(r_cached.latency.total_pipeline_ms)
+            await asyncio.sleep(4.0)
 
     # 4. Compute Statistical Percentiles
-    overall_percentiles = calc_percentiles(stage_timings["total_pipeline"])
+    overall_percentiles = calc_percentiles(stage_timings["end_to_end"])
     stage_percentiles = {stage: calc_percentiles(times) for stage, times in stage_timings.items()}
 
     category_stats = {}

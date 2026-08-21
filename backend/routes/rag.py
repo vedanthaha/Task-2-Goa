@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import logging
 import time
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, UploadFile, Request
 
 from models.schemas import (
     QueryRequest,
@@ -12,20 +10,24 @@ from models.schemas import (
     SearchResultItem,
 )
 from rag.orchestrator import orchestrator
+from services.limiter import limiter
 
 router = APIRouter(prefix="/api/rag", tags=["rag"])
 logger = logging.getLogger(__name__)
 
 
 @router.post("/query", response_model=QueryResponse)
-async def query_rag(payload: QueryRequest) -> QueryResponse:
+@limiter.limit("20/minute")
+async def query_rag(request: Request, payload: QueryRequest) -> QueryResponse:
     """Executes full online RAG inference pipeline on text query."""
     logger.info("RAG query received: %r (top_k=%d)", payload.query, payload.top_k)
     return await orchestrator.execute_query(query=payload.query, top_k=payload.top_k)
 
 
 @router.post("/voice-query", response_model=QueryResponse)
+@limiter.limit("10/minute")
 async def voice_query_rag(
+    request: Request,
     file: UploadFile = File(...),
     language_code: str = Form("en-IN"),
     top_k: int = Form(5),
@@ -43,7 +45,8 @@ async def voice_query_rag(
 
 
 @router.post("/search", response_model=SearchResponse)
-async def search_rag(payload: SearchRequest) -> SearchResponse:
+@limiter.limit("30/minute")
+async def search_rag(request: Request, payload: SearchRequest) -> SearchResponse:
     """Executes parallel hybrid search over indexed MSMARCO-XI corpus."""
     start_time = time.perf_counter()
     candidates = await orchestrator.retriever.search(query=payload.query, top_k=payload.top_k)
