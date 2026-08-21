@@ -1,111 +1,106 @@
 "use client";
 
-export function ArchitectureDiagram() {
-  const steps = [
-    {
-      num: "01",
-      title: "Voice Input",
-      desc: "Browser MediaRecorder / WAV stream",
-      badge: "Realtime",
-      color: "from-emerald-500 to-teal-500",
-    },
-    {
-      num: "02",
-      title: "Sarvam STT",
-      desc: "Indic & English speech transcription",
-      badge: "Saaras v1",
-      color: "from-cyan-500 to-blue-500",
-    },
-    {
-      num: "03",
-      title: "Safety Guardrails",
-      desc: "Prompt injection & off-topic checks",
-      badge: "Security",
-      color: "from-indigo-500 to-violet-500",
-    },
-    {
-      num: "04",
-      title: "Parallel Hybrid Search",
-      desc: "Dense Vector + BM25 Lexical concurrent",
-      badge: "MSMARCO-XI",
-      color: "from-purple-500 to-pink-500",
-    },
-    {
-      num: "05",
-      title: "Reciprocal Rank Fusion",
-      desc: "RRF score aggregation: w/(k + rank)",
-      badge: "Fusion",
-      color: "from-pink-500 to-rose-500",
-    },
-    {
-      num: "06",
-      title: "Adaptive Reranker",
-      desc: "Confidence bypass to protect <200ms SLA",
-      badge: "Low-Latency",
-      color: "from-amber-500 to-orange-500",
-    },
-    {
-      num: "07",
-      title: "Grounded Generation",
-      desc: "Context-bounded LLM response with citations",
-      badge: "Gemini",
-      color: "from-emerald-500 to-cyan-500",
-    },
-    {
-      num: "08",
-      title: "Grounding Verifier",
-      desc: "Post-generation hallucination detection",
-      badge: "Verification",
-      color: "from-teal-500 to-emerald-500",
-    },
-  ];
+import { ArrowRight, ArrowDown } from "lucide-react";
 
+export function ArchitectureDiagram() {
   return (
-    <div className="w-full p-6 sm:p-8 glass-card shadow-2xl space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2 pb-4 border-b border-white/10">
+    <div className="w-full space-y-6">
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
         <div>
-          <h2 className="text-base font-semibold text-white flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-            End-to-End Pipeline Architecture
-          </h2>
-          <p className="text-xs text-white/50 mt-0.5">
-            Strict separation between Offline Indexing and Online Inference
+          <h2 className="text-[20px] font-semibold text-white">System Architecture</h2>
+          <p className="text-[13px] text-neutral-500 mt-1">
+            Voice RAG data flow and execution graph
           </p>
         </div>
-        <span className="px-3 py-1 rounded-full text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          Target SLA: &lt;200ms
-        </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {steps.map((s, idx) => (
-          <div
-            key={idx}
-            className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all space-y-2 relative overflow-hidden group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-white/40 group-hover:text-white/70 transition-colors">
-                {s.num}
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/40 border border-white/10 text-white/50">
-                {s.badge}
-              </span>
-            </div>
-
-            <div className="text-sm font-semibold text-white/90">
-              {s.title}
-            </div>
-
-            <p className="text-xs text-white/50 leading-relaxed font-sans">
-              {s.desc}
-            </p>
-
-            <div
-              className={`h-1 w-full rounded-full bg-gradient-to-r ${s.color} opacity-40 group-hover:opacity-100 transition-opacity mt-2`}
-            />
+      <div className="w-full glass-card bg-[rgba(255,255,255,0.01)] p-8 flex flex-col items-center justify-center min-h-[260px]">
+        {/* Desktop/Tablet Pipeline */}
+        <div className="hidden lg:flex flex-col items-center w-full relative">
+          
+          {/* Row 1 */}
+          <div className="flex items-center gap-2 z-10 relative">
+            <PipelineNode title="Voice Input" subtitle="WAV Stream" />
+            <NodeConnector />
+            <PipelineNode title="Sarvam STT" subtitle="Saaras v1" />
+            <NodeConnector />
+            <PipelineNode title="Guardrails" subtitle="Safety Checks" />
           </div>
-        ))}
+
+          {/* Downwards to parallel */}
+          <div className="h-6 border-l border-[rgba(255,255,255,0.1)] z-0" />
+          
+          <div className="w-full max-w-[280px] border-t border-[rgba(255,255,255,0.1)] flex justify-between relative z-0 h-4">
+             <div className="w-[1px] h-full bg-[rgba(255,255,255,0.1)] absolute left-0 top-0" />
+             <div className="w-[1px] h-full bg-[rgba(255,255,255,0.1)] absolute right-0 top-0" />
+          </div>
+
+          {/* Row 2: Parallel Search */}
+          <div className="flex items-center justify-between w-full max-w-[320px] z-10 relative -mt-2">
+            <PipelineNode title="Dense Vector" subtitle="Semantic" />
+            <PipelineNode title="BM25 Lexical" subtitle="Keyword" />
+          </div>
+
+          {/* Downwards from parallel to RRF */}
+          <div className="w-full max-w-[280px] border-b border-[rgba(255,255,255,0.1)] flex justify-between relative z-0 h-4 mt-0.5">
+             <div className="w-[1px] h-full bg-[rgba(255,255,255,0.1)] absolute left-0 bottom-0" />
+             <div className="w-[1px] h-full bg-[rgba(255,255,255,0.1)] absolute right-0 bottom-0" />
+          </div>
+          <div className="h-4 border-l border-[rgba(255,255,255,0.1)] z-0" />
+          
+          {/* Row 3 & 4 (Combined horizontally for compactness) */}
+          <div className="flex items-center gap-2 z-10 relative mt-0.5">
+            <PipelineNode title="RRF Fusion" subtitle="Rank Aggregation" highlight />
+            <NodeConnector />
+            <PipelineNode title="Adaptive Reranker" subtitle="Bypass Logic" />
+            <NodeConnector />
+            <PipelineNode title="LLM Gen" subtitle="Groq LLaMA 3.3" />
+            <NodeConnector />
+            <PipelineNode title="Grounding" subtitle="Verifier" />
+          </div>
+        </div>
+
+        {/* Mobile View */}
+        <div className="flex lg:hidden flex-col items-center space-y-2 w-full">
+           <PipelineNode title="Voice Input" subtitle="WAV Stream" />
+           <ArrowDown size={14} className="text-neutral-600" />
+           <PipelineNode title="Sarvam STT" subtitle="Saaras v1" />
+           <ArrowDown size={14} className="text-neutral-600" />
+           <PipelineNode title="Guardrails" subtitle="Safety Checks" />
+           <ArrowDown size={14} className="text-neutral-600" />
+           
+           <div className="flex gap-2 w-full justify-center my-1">
+              <PipelineNode title="Dense Vector" subtitle="Semantic" />
+              <PipelineNode title="BM25 Lexical" subtitle="Keyword" />
+           </div>
+           
+           <ArrowDown size={14} className="text-neutral-600" />
+           <PipelineNode title="RRF Fusion" subtitle="Rank Aggregation" highlight />
+           <ArrowDown size={14} className="text-neutral-600" />
+           <PipelineNode title="Adaptive Reranker" subtitle="Bypass Logic" />
+           <ArrowDown size={14} className="text-neutral-600" />
+           <PipelineNode title="LLM Gen" subtitle="Groq LLaMA 3.3" />
+           <ArrowDown size={14} className="text-neutral-600" />
+           <PipelineNode title="Grounding" subtitle="Verifier" />
+        </div>
       </div>
+    </div>
+  );
+}
+
+function PipelineNode({ title, subtitle, highlight = false }: { title: string, subtitle: string, highlight?: boolean }) {
+  return (
+    <div className={`flex flex-col items-center justify-center text-center px-4 py-2.5 min-w-[120px] rounded-[10px] border ${highlight ? 'bg-[rgba(124,95,247,0.1)] border-[rgba(124,95,247,0.4)] shadow-[0_0_15px_rgba(124,95,247,0.15)]' : 'bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.08)]'}`}>
+      <span className="text-[13px] font-semibold text-white whitespace-nowrap">{title}</span>
+      <span className="text-[11px] text-neutral-400 mt-0.5 font-mono uppercase tracking-wider">{subtitle}</span>
+    </div>
+  );
+}
+
+function NodeConnector() {
+  return (
+    <div className="text-neutral-700 mx-0.5">
+      <ArrowRight size={14} strokeWidth={2} />
     </div>
   );
 }
