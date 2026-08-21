@@ -248,31 +248,33 @@ Implemented in [`backend/rag/guardrails.py`](file:///c:/Users/rspma/Downloads/Ta
 
 Reproducible via `python backend/benchmark/run_benchmark.py`.
 
+> **Note:** The following results are pending execution with the new Groq API integration to measure true end-to-end HTTP latency. Please configure your `GROQ_API_KEY` in `backend/.env` and re-run the benchmark to populate this table.
+
 ### Percentile Summary
 
 | Metric | Target SLA | Measured Latency | Compliance Status |
 | :--- | :--- | :--- | :--- |
-| **P50 Latency (Median)** | **< 200 ms** | **`1.316 ms`** | ✅ **PASSED** |
-| **P70 Latency** | **< 200 ms** | **`1.413 ms`** | ✅ **PASSED** |
-| **P90 Latency** | **< 200 ms** | **`1.546 ms`** | ✅ **PASSED** |
-| **P95 Latency** | **< 200 ms** | **`1.686 ms`** | ✅ **PASSED** |
-| **P100 Latency (Max)** | **< 200 ms** | **`14.258 ms`** | ✅ **PASSED** |
-| **Mean Pipeline Latency** | — | `1.424 ms` | ✅ **Optimal** |
+| **P50 Latency (Median)** | **< 200 ms** | `[TBD]` | ⏳ **Pending** |
+| **P70 Latency** | **< 200 ms** | `[TBD]` | ⏳ **Pending** |
+| **P90 Latency** | **< 200 ms** | `[TBD]` | ⏳ **Pending** |
+| **P95 Latency** | **< 200 ms** | `[TBD]` | ⏳ **Pending** |
+| **P100 Latency (Max)** | **< 200 ms** | `[TBD]` | ⏳ **Pending** |
+| **Mean Pipeline Latency** | — | `[TBD]` | ⏳ **Pending** |
 
 ### Stage-by-Stage Waterfall
 
 | Stage | P50 (ms) | P70 (ms) | P100 (ms) | Mean (ms) | % of Total Time |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. Query Preprocessing & Safety** | `0.020 ms` | `0.022 ms` | `0.041 ms` | `0.021 ms` | 1.5% |
-| **2. Dense Vector Search (In-Memory)** | `0.720 ms` | `0.799 ms` | `13.734 ms` | `0.818 ms` | 57.4% |
-| **3. Lexical BM25 Search (Okapi)** | `0.667 ms` | `0.746 ms` | `13.686 ms` | `0.771 ms` | 54.1% |
-| **4. Reciprocal Rank Fusion (RRF)** | `0.031 ms` | `0.033 ms` | `0.055 ms` | `0.030 ms` | 2.1% |
-| **5. Adaptive Latency-Aware Reranker** | `0.004 ms` | `0.005 ms` | `0.124 ms` | `0.012 ms` | 0.8% |
-| **6. Grounded LLM Generation** | `0.225 ms` | `0.240 ms` | `0.404 ms` | `0.220 ms` | 15.4% |
-| **7. Grounding & Hallucination Check** | `0.128 ms` | `0.140 ms` | `0.857 ms` | `0.158 ms` | 11.1% |
-| **Total Online Pipeline** | **`1.316 ms`** | **`1.413 ms`** | **`14.258 ms`** | `1.424 ms` | 100.0% |
+| **1. Query Preprocessing & Safety** | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` |
+| **2. Dense Vector Search (In-Memory)** | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` |
+| **3. Lexical BM25 Search (Okapi)** | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` |
+| **4. Reciprocal Rank Fusion (RRF)** | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` |
+| **5. Adaptive Latency-Aware Reranker** | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` |
+| **6. Grounded LLM Generation (Groq)** | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` |
+| **7. Grounding & Hallucination Check** | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` | `[TBD]` |
+| **Total Online Pipeline** | **`[TBD]`** | **`[TBD]`** | **`[TBD]`** | `[TBD]` | 100.0% |
 
-*Generated artifacts*: [`results/benchmark.json`](file:///c:/Users/rspma/Downloads/Task-2-Goa/results/benchmark.json), [`results/benchmark.csv`](file:///c:/Users/rspma/Downloads/Task-2-Goa/results/benchmark.csv), [`results/latency_report.md`](file:///c:/Users/rspma/Downloads/Task-2-Goa/results/latency_report.md).
+*Generated artifacts*: `results/benchmark.json`, `results/benchmark.csv`, `results/latency_report.md`.
 
 ---
 

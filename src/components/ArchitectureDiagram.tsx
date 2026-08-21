@@ -61,14 +61,14 @@ export function ArchitectureDiagram() {
   ];
 
   return (
-    <div className="w-full p-6 sm:p-8 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-2xl space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2 pb-4 border-b border-slate-800">
+    <div className="w-full p-6 sm:p-8 glass-card shadow-2xl space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-2 pb-4 border-b border-white/10">
         <div>
-          <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
+          <h2 className="text-base font-semibold text-white flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
             End-to-End Pipeline Architecture
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-white/50 mt-0.5">
             Strict separation between Offline Indexing and Online Inference
           </p>
         </div>
@@ -81,22 +81,22 @@ export function ArchitectureDiagram() {
         {steps.map((s, idx) => (
           <div
             key={idx}
-            className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 hover:border-slate-700 transition-all space-y-2 relative overflow-hidden group"
+            className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all space-y-2 relative overflow-hidden group"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-slate-500 group-hover:text-slate-300 transition-colors">
+              <span className="text-xs font-mono font-bold text-white/40 group-hover:text-white/70 transition-colors">
                 {s.num}
               </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-slate-400">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/40 border border-white/10 text-white/50">
                 {s.badge}
               </span>
             </div>
 
-            <div className="text-sm font-semibold text-slate-200">
+            <div className="text-sm font-semibold text-white/90">
               {s.title}
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed font-sans">
+            <p className="text-xs text-white/50 leading-relaxed font-sans">
               {s.desc}
             </p>
 

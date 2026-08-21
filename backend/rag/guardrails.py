@@ -25,6 +25,11 @@ INJECTION_PATTERNS = [
     r"reveal\s+(your\s+)?(system\s+prompt|instructions)",
     r"bypass\s+all\s+(filters|rules|safeguards)",
     r"act\s+as\s+(dan|an\s+unrestricted\s+ai|an\s+evil\s+ai)",
+    r"let(?:'s|s)\s+play\s+a\s+game",
+    r"imagine\s+you\s+are\s+(not|no\s+longer)",
+    r"pretend\s+(that\s+)?you\s+are",
+    r"assume\s+(the\s+role\s+of|a\s+new\s+persona)",
+    r"from\s+(now|here)\s+on\s+you\s+will",
 ]
 
 UNSAFE_PATTERNS = [

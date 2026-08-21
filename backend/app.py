@@ -7,11 +7,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from models.schemas import ErrorResponse, HealthResponse
 from routes import rag, voice, analytics
 from services.config import get_settings
 from services.exceptions import AppError
+from services.limiter import limiter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,9 +29,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[get_settings().frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,13 +74,13 @@ async def unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 async def health() -> HealthResponse:
     settings = get_settings()
-    gemini_configured = bool(settings.gemini_api_key)
+    groq_configured = bool(settings.groq_api_key)
     sarvam_configured = bool(settings.sarvam_api_key)
     return HealthResponse(
-        status="ok" if (gemini_configured or sarvam_configured) else "degraded",
+        status="ok" if (groq_configured or sarvam_configured) else "degraded",
         checks={
             "api": "ok",
-            "gemini_configured": gemini_configured,
+            "groq_configured": groq_configured,
             "sarvam_configured": sarvam_configured,
             "target_latency_ms": settings.target_latency_ms,
         },

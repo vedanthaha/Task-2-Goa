@@ -9,9 +9,9 @@ load_dotenv(BASE_DIR / ".env")
 
 
 class Settings:
-    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "").strip()
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
-    gemini_timeout_seconds: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "12.0"))
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "").strip()
+    groq_model: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b").strip()
+    groq_timeout_seconds: float = float(os.getenv("GROQ_TIMEOUT_SECONDS", "12.0"))
     sarvam_api_key: str = os.getenv("SARVAM_API_KEY", "").strip()
     sarvam_model: str = os.getenv("SARVAM_MODEL", "saarika:v2.5").strip()
 

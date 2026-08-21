@@ -180,11 +180,13 @@ export function useVoiceRecorder(): VoiceRecorderState {
             } else if (now - silenceStartRef.current >= SILENCE_THRESHOLD_MS) {
               // Silence detected after user spoke full question -> auto-stop!
               silenceStartRef.current = null;
+              const cb = autoStopCallbackRef.current;
+              autoStopCallbackRef.current = null; // clear immediately to prevent double-fire
               stopRecordingInternal().then((blob) => {
-                if (blob && autoStopCallbackRef.current) {
-                  autoStopCallbackRef.current(blob);
+                if (blob && cb) {
+                  cb(blob);
                 }
-              });
+              }).catch(() => {});
               return;
             }
           }
@@ -206,6 +208,7 @@ export function useVoiceRecorder(): VoiceRecorderState {
   );
 
   const stopRecording = useCallback(async (): Promise<Blob | null> => {
+    autoStopCallbackRef.current = null; // prevent auto-stop callback from also firing
     return stopRecordingInternal();
   }, [stopRecordingInternal]);
 
