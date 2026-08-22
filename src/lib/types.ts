@@ -112,6 +112,7 @@ export interface BenchmarkResponse {
   p100_ms: number;
   mean_ms: number;
   target_met: boolean;
+  target_latency_ms?: number;
   stages?: Record<string, {
     p50_ms: number;
     mean_ms: number;
