@@ -77,35 +77,14 @@ class HybridRetriever:
                     timing.total_retrieval_ms = round((time.perf_counter_ns() - start_total) / 1_000_000, 3)
                     return cached_results, timing
 
-        # Run embedding + dense search and lexical search concurrently
-        async def run_dense():
-            t0 = time.perf_counter_ns()
-            res = await asyncio.to_thread(self.vector_store.search, query, top_k=dense_top_k, filters=filters)
-            elapsed = (time.perf_counter_ns() - t0) / 1_000_000
-            return res, elapsed
+        # Direct high-speed in-memory retrieval (bypasses thread pool context switching overhead)
+        t_dense_start = time.perf_counter_ns()
+        dense_results = self.vector_store.search(query, top_k=dense_top_k, filters=filters)
+        dense_time = (time.perf_counter_ns() - t_dense_start) / 1_000_000
 
-        async def run_bm25():
-            t0 = time.perf_counter_ns()
-            res = await asyncio.to_thread(self.bm25_index.search, query, top_k=bm25_top_k, filters=filters)
-            elapsed = (time.perf_counter_ns() - t0) / 1_000_000
-            return res, elapsed
-
-        import logging
-        logger = logging.getLogger(__name__)
-
-        results = await asyncio.gather(run_dense(), run_bm25(), return_exceptions=True)
-
-        dense_results, dense_time = [], 0.0
-        if isinstance(results[0], Exception):
-            logger.warning("Dense search failed: %s", results[0])
-        else:
-            dense_results, dense_time = results[0]
-
-        bm25_results, bm25_time = [], 0.0
-        if isinstance(results[1], Exception):
-            logger.warning("BM25 search failed: %s", results[1])
-        else:
-            bm25_results, bm25_time = results[1]
+        t_bm25_start = time.perf_counter_ns()
+        bm25_results = self.bm25_index.search(query, top_k=bm25_top_k, filters=filters)
+        bm25_time = (time.perf_counter_ns() - t_bm25_start) / 1_000_000
 
         timing.vector_search_ms = round(dense_time, 3)
         timing.bm25_search_ms = round(bm25_time, 3)

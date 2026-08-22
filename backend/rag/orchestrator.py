@@ -174,10 +174,19 @@ class RAGOrchestrator:
             final_docs = rerank_res.results
         breakdown.reranking_ms = round((time.perf_counter_ns() - t_rerank_start) / 1_000_000, 3)
 
-        # 5. Prompt Construction & Grounded Generation
+        # 5. Prompt Construction & Grounded Generation (latency-budgeted)
         t_gen_start = time.perf_counter_ns()
+        elapsed_so_far_s = (t_gen_start - t_total_start) / 1_000_000_000
+        # Reserve 30ms buffer for retrieval, reranking, grounding verification, and event loop overhead
+        target_max_s = (settings.target_latency_ms - 30.0) / 1000.0
+        remaining_budget_s = max(0, target_max_s - elapsed_so_far_s)
         try:
-            answer, citations = await self.generator.generate_response(query=query, documents=final_docs)
+            answer, citations = await self.generator.generate_response(
+                query=query,
+                documents=final_docs,
+                use_cache=use_cache,
+                deadline_seconds=remaining_budget_s,
+            )
             if not answer or answer.strip() == "":
                 top_passage = final_docs[0].text if final_docs else "No context available."
                 answer = f"According to the retrieved records: {top_passage[:300]}..."
@@ -244,6 +253,12 @@ class RAGOrchestrator:
         response.latency.total_pipeline_ms = round(response.latency.total_pipeline_ms + stt_elapsed_ms, 3)
 
         return transcript, response
+
+    def clear_cache(self) -> None:
+        """Clears all in-memory caches across retriever and generator."""
+        self.retriever.clear_cache()
+        if hasattr(self.generator.llm_service, "clear_cache"):
+            self.generator.llm_service.clear_cache()
 
 
 # Global instance

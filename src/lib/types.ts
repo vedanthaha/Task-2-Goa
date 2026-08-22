@@ -86,6 +86,24 @@ export interface CategoryStat {
   query_count: number;
 }
 
+export interface BenchmarkQueryResultItem {
+  query: string;
+  answer_preview: string;
+  citations_count: number;
+  grounding_score: number;
+  confidence_score: number;
+  latency_ms: number;
+  stages?: {
+    query_processing_ms?: number;
+    vector_search_ms?: number;
+    bm25_search_ms?: number;
+    hybrid_fusion_ms?: number;
+    reranking_ms?: number;
+    generation_ms?: number;
+    grounding_ms?: number;
+  };
+}
+
 export interface BenchmarkResponse {
   total_queries: number;
   p50_ms: number;
@@ -94,14 +112,13 @@ export interface BenchmarkResponse {
   p100_ms: number;
   mean_ms: number;
   target_met: boolean;
-  results: Array<{
-    query: string;
-    answer_preview: string;
-    citations_count: number;
-    grounding_score: number;
-    confidence_score: number;
-    latency_ms: number;
+  stages?: Record<string, {
+    p50_ms: number;
+    mean_ms: number;
+    p95_ms: number;
+    p100_ms: number;
   }>;
+  results: BenchmarkQueryResultItem[];
 }
 
 export type InteractionState =

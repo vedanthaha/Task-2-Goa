@@ -19,6 +19,8 @@ class GroundedGenerator:
         self,
         query: str,
         documents: list[HybridSearchResult],
+        use_cache: bool = True,
+        deadline_seconds: float | None = None,
     ) -> tuple[str, list[Citation]]:
         if not documents:
             return NO_EVIDENCE_ANSWER, []
@@ -37,6 +39,8 @@ class GroundedGenerator:
         raw_answer = await self.llm_service.answer_from_context(
             query=query,
             documents=search_items,
+            use_cache=use_cache,
+            deadline_seconds=deadline_seconds,
         )
 
         citations = [

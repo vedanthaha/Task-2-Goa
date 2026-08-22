@@ -56,7 +56,7 @@ async def run_full_benchmark(
         logger.info("Executing warmup pass...")
         for q in BENCHMARK_QUERIES[:5]:
             await client.post("/api/rag/query", json={"query": q.query, "top_k": 5})
-        orchestrator.retriever.clear_cache()
+        orchestrator.clear_cache()
         logger.info("Warmup complete.")
 
         # 2. Main Benchmark Run

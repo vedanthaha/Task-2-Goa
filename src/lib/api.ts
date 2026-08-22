@@ -52,9 +52,12 @@ export async function sendVoiceQuery(
 
 export async function runBenchmark(
   queries?: string[],
-  top_k: number = 5
+  top_k: number = 5,
+  useCache: boolean = false
 ): Promise<BenchmarkResponse> {
-  const payload = queries ? { queries, top_k } : { top_k };
+  const payload = queries
+    ? { queries, top_k, use_cache: useCache }
+    : { top_k, use_cache: useCache };
   const res = await fetch(`${API_BASE_URL}/api/analytics/benchmark/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
