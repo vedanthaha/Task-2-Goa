@@ -186,7 +186,7 @@ class RAGOrchestrator:
                 query=query,
                 documents=final_docs,
                 use_cache=use_cache,
-                deadline_seconds=remaining_budget_s,
+                deadline_seconds=None,
             )
             if not answer or answer.strip() == "":
                 answer = "I could not find sufficient evidence in the retrieved knowledge base to answer your question."

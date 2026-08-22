@@ -93,16 +93,8 @@ class LLMService:
                     self._cache.move_to_end(cache_key)
                     return self._cache[cache_key]
 
-        # 1. Try ultra-fast Extractive Synthesis first!
-        extractive_ans = self._synthesize_extractive_answer(query=query, documents=documents)
-        if extractive_ans != NO_EVIDENCE_ANSWER:
-            # If we found an answer extractively, use it immediately! (Latency < 50ms)
-            if use_cache:
-                with self._cache_lock:
-                    self._cache[cache_key] = extractive_ans
-                    if len(self._cache) > self._cache_capacity:
-                        self._cache.popitem(last=False)
-            return extractive_ans
+        # We completely bypass the flawed extractive synthesis because it produced garbage sentences 
+        # and bypassed the LLM, causing the user to see "According to the retrieved records: [irrelevant sentence]".
 
         # 2. If out-of-domain (extractive failed), fallback to LLM for parametric knowledge
         prompt = self._build_prompt(query, documents)
