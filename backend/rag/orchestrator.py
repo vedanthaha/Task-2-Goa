@@ -158,6 +158,7 @@ class RAGOrchestrator:
         breakdown.hybrid_fusion_ms = ret_timing.fusion_ms
 
         # 3. Retrieval Confidence Check
+        logger.info(f"Hybrid candidates: {[c.id for c in hybrid_candidates]}")
         t_conf_start = time.perf_counter_ns()
         conf_res = self.safety_guard.validate_retrieval_confidence(query, hybrid_candidates)
         conf_time = (time.perf_counter_ns() - t_conf_start) / 1_000_000
@@ -188,12 +189,10 @@ class RAGOrchestrator:
                 deadline_seconds=remaining_budget_s,
             )
             if not answer or answer.strip() == "":
-                top_passage = final_docs[0].text if final_docs else "No context available."
-                answer = f"According to the retrieved records: {top_passage[:300]}..."
+                answer = "I could not find sufficient evidence in the retrieved knowledge base to answer your question."
         except Exception as exc:
             logger.error("LLM Generation error: %s", exc)
-            top_passage = final_docs[0].text if final_docs else "No context available."
-            answer = f"According to the retrieved records: {top_passage[:300]}..."
+            answer = "I could not find sufficient evidence in the retrieved knowledge base to answer your question."
             citations = [
                 Citation(
                     id=doc.id,
@@ -226,7 +225,7 @@ class RAGOrchestrator:
                 is_safe=True,
                 is_on_topic=conf_res.passed,
                 prompt_injection_detected=False,
-                grounding_score=grounding_res.grounding_score if conf_res.passed else 0.0,
+                grounding_score=grounding_res.grounding_score,
                 confidence_score=conf_res.confidence_score,
                 flag_reasons=conf_res.flag_reasons if not conf_res.passed else [],
             ),

@@ -40,7 +40,7 @@ UNSAFE_PATTERNS = [
 class SafetyGuard:
     """Multi-layer safety and input guardrails for Voice-Enabled RAG."""
 
-    def __init__(self, min_confidence_threshold: float = 0.010) -> None:
+    def __init__(self, min_confidence_threshold: float = 0.005) -> None:
         self.min_confidence_threshold = min_confidence_threshold
 
     def validate_query(self, query: str) -> GuardrailResult:

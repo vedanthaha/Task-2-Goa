@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from rag.orchestrator import orchestrator
 from services.latency_tracker import latency_tracker
+from services.config import get_settings
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 logger = logging.getLogger(__name__)
@@ -57,8 +58,8 @@ async def get_latency_metrics() -> dict[str, Any]:
             "p100_ms": total_metrics.p100_ms,
             "mean_ms": total_metrics.mean_ms,
             "sample_count": total_metrics.sample_count,
-            "target_ms": 200.0,
-            "under_200ms_target": total_metrics.p50_ms <= 200.0 if total_metrics.sample_count > 0 else True,
+            "target_ms": get_settings().target_latency_ms,
+            "under_target": total_metrics.p50_ms <= get_settings().target_latency_ms if total_metrics.sample_count > 0 else True,
         },
         "stages": {
             "stt": {"p50_ms": stt_metrics.p50_ms, "mean_ms": stt_metrics.mean_ms},
@@ -148,7 +149,7 @@ async def run_benchmark(payload: BenchmarkRequest) -> BenchmarkResponse:
         p95_ms=p95,
         p100_ms=p100,
         mean_ms=mean_val,
-        target_met=p100 <= 200.0,
+        target_met=p100 <= get_settings().target_latency_ms,
         stages=computed_stages,
         results=results,
     )

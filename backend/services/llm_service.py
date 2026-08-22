@@ -30,9 +30,9 @@ class LLMService:
 
     def __init__(self, cache_capacity: int = 4096) -> None:
         limits = httpx.Limits(
-            max_keepalive_connections=30,
-            max_connections=50,
-            keepalive_expiry=60.0,
+            max_keepalive_connections=50,
+            max_connections=100,
+            keepalive_expiry=3600.0,
         )
         self._client = httpx.AsyncClient(limits=limits, timeout=2.5)
         self._cache_capacity = cache_capacity
@@ -51,19 +51,29 @@ class LLMService:
         settings = get_settings()
         if not settings.groq_api_key:
             return
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {settings.groq_api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": settings.groq_model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+        }
+        import asyncio
+        async def _heartbeat():
+            while True:
+                try:
+                    await self._client.post(url, headers=headers, json=payload, timeout=2.0)
+                except Exception:
+                    pass
+                await asyncio.sleep(15.0)
+                
         try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {settings.groq_api_key}",
-                "Content-Type": "application/json",
-            }
-            payload = {
-                "model": settings.groq_model,
-                "messages": [{"role": "user", "content": "ping"}],
-                "max_tokens": 1,
-            }
             await self._client.post(url, headers=headers, json=payload, timeout=2.0)
             logger.info("Groq HTTP connection pool pre-warmed successfully.")
+            asyncio.create_task(_heartbeat())
         except Exception as exc:
             logger.debug("Groq warmup skipped: %s", exc)
 
@@ -75,44 +85,43 @@ class LLMService:
         use_cache: bool = True,
         deadline_seconds: float | None = None,
     ) -> str:
-        if not documents:
-            return NO_EVIDENCE_ANSWER
-
-        # Check Cache
-        norm_query = query.strip().lower()
-        doc_signature = ":".join(d.id for d in documents[:3])
-        cache_key = f"{norm_query}|{doc_signature}"
-
+        # Check cache first
+        cache_key = f"{query.strip().lower()}:{len(documents)}"
         if use_cache:
             with self._cache_lock:
                 if cache_key in self._cache:
-                    cached_ans = self._cache[cache_key]
                     self._cache.move_to_end(cache_key)
-                    return cached_ans
+                    return self._cache[cache_key]
 
-        settings = get_settings()
-        instructions = system_instructions or self._default_instructions()
-        prompt = self._build_prompt(query=query, documents=documents)
+        # 1. Try ultra-fast Extractive Synthesis first!
+        extractive_ans = self._synthesize_extractive_answer(query=query, documents=documents)
+        if extractive_ans != NO_EVIDENCE_ANSWER:
+            # If we found an answer extractively, use it immediately! (Latency < 50ms)
+            if use_cache:
+                with self._cache_lock:
+                    self._cache[cache_key] = extractive_ans
+                    if len(self._cache) > self._cache_capacity:
+                        self._cache.popitem(last=False)
+            return extractive_ans
 
-        # Generate answer with latency-budgeted Groq call or extractive synthesis fallback
+        # 2. If out-of-domain (extractive failed), fallback to LLM for parametric knowledge
+        prompt = self._build_prompt(query, documents)
+        instructions = self._default_instructions()
+        
         try:
-            coro = self._generate_text(instructions=instructions, prompt=prompt)
-            if deadline_seconds is not None and deadline_seconds > 0.01:
-                answer = await asyncio.wait_for(coro, timeout=deadline_seconds)
-            else:
-                # No budget left — skip LLM entirely, use extractive synthesis
-                answer = ""
+            coro = self._generate_text(
+                instructions=instructions, 
+                prompt=prompt,
+                deadline_seconds=deadline_seconds
+            )
+            answer = await coro
             answer = self._clean_llm_response(answer) if answer else ""
-        except asyncio.TimeoutError:
-            logger.info("Groq LLM exceeded latency budget (%.0fms). Using extractive synthesis.",
-                        (deadline_seconds or 0) * 1000)
-            answer = self._synthesize_extractive_answer(query=query, documents=documents)
         except Exception as exc:
-            logger.warning("External LLM generation error (%s). Using extractive synthesis.", exc)
-            answer = self._synthesize_extractive_answer(query=query, documents=documents)
+            logger.warning("External LLM generation error (%s).", exc)
+            answer = NO_EVIDENCE_ANSWER
 
         if not answer or answer.strip() == "":
-            answer = self._synthesize_extractive_answer(query=query, documents=documents)
+            answer = NO_EVIDENCE_ANSWER
 
         # Store in LRU cache
         if use_cache and answer:
@@ -128,6 +137,7 @@ class LLMService:
         instructions: str,
         prompt: str,
         temperature: float = 0.0,
+        deadline_seconds: float | None = None,
     ) -> str:
         settings = get_settings()
         if not settings.groq_api_key:
@@ -146,35 +156,61 @@ class LLMService:
             ],
             "temperature": temperature,
             "max_tokens": 80,
+            "stream": True,
         }
 
+        import json
+        import asyncio
+        import httpx
         t0 = time.perf_counter()
-        response = await self._client.post(
-            url,
-            headers=headers,
-            json=payload,
-            timeout=settings.groq_timeout_seconds,
-        )
-        elapsed_ms = (time.perf_counter() - t0) * 1000
-        logger.info("Groq response: %.1fms (status=%d)", elapsed_ms, response.status_code)
-
-        if response.status_code == 429:
-            raise ExternalServiceError("Groq rate limit exceeded (429).")
-        response.raise_for_status()
-
+        content_chunks = []
+        
+        async def _stream_gen():
+            async with self._client.stream(
+                "POST", 
+                url, 
+                headers=headers, 
+                json=payload, 
+                timeout=settings.groq_timeout_seconds
+            ) as response:
+                if response.status_code == 429:
+                    raise ExternalServiceError("Groq rate limit exceeded (429).")
+                response.raise_for_status()
+                
+                async for chunk in response.aiter_lines():
+                    if chunk.startswith("data: "):
+                        if chunk == "data: [DONE]":
+                            break
+                        try:
+                            data = json.loads(chunk[6:])
+                            delta = data["choices"][0].get("delta", {}).get("content", "")
+                            if delta:
+                                content_chunks.append(delta)
+                        except Exception:
+                            pass
+        
         try:
-            data = response.json()
-        except ValueError as exc:
-            raise ExternalServiceError("Groq returned non-JSON response.") from exc
+            if deadline_seconds:
+                await asyncio.wait_for(_stream_gen(), timeout=deadline_seconds)
+            else:
+                await _stream_gen()
+        except (asyncio.TimeoutError, TimeoutError):
+            logger.info("LLM generation SLA hit! (asyncio timeout). Cutting off early.")
+        except Exception as exc:
+            logger.warning("External LLM generation stream error (%s).", exc)
+            if not content_chunks:
+                raise
 
-        choices = data.get("choices") or [{}]
-        content = choices[0].get("message", {}).get("content", "")
-        return content.strip()
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        logger.info("Groq stream completed: %.1fms", elapsed_ms)
+
+        content = "".join(content_chunks).strip()
+        return content
 
     @staticmethod
     def _clean_llm_response(text: str) -> str:
-        """Removes reasoning tokens (<think>...</think>) if produced by reasoning models."""
-        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+        """Removes reasoning tokens (<think>...</think> or unclosed <think>) if produced by reasoning models."""
+        cleaned = re.sub(r"<think>.*?(?:</think>|$)", "", text, flags=re.DOTALL).strip()
         return cleaned or text.strip()
 
     @staticmethod
@@ -185,8 +221,14 @@ class LLMService:
         """
         if not documents:
             return NO_EVIDENCE_ANSWER
+            
+        # The regex below splits Hindi and other unicode languages aggressively, causing false positive overlaps.
+        # Fallback to true LLM generation for all non-ASCII queries to guarantee accurate custom answers.
+        if not query.isascii():
+            return NO_EVIDENCE_ANSWER
 
-        query_terms = set(re.findall(r"\w+", query.lower()))
+        stop_words = {"i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself", "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this", "that", "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now", "could", "would", "actually", "detail", "wondering", "tell", "explain"}
+        query_terms = set(re.findall(r"\w+", query.lower())) - stop_words
         best_sentences = []
 
         for doc in documents[:2]:
@@ -198,21 +240,25 @@ class LLMService:
 
         if best_sentences:
             best_sentences.sort(key=lambda x: x[0], reverse=True)
-            top_sents = [s for _, s in best_sentences[:2] if len(s) > 10]
+            if best_sentences[0][0] == 0:
+                return NO_EVIDENCE_ANSWER
+                
+            top_sents = [s for overlap, s in best_sentences[:2] if len(s) > 10 and overlap > 0]
             if top_sents:
                 combined = " ".join(top_sents)
                 return f"According to the retrieved records: {combined}"
 
-        top_passage = documents[0].text
-        return f"According to the retrieved records: {top_passage[:280]}..."
+        return NO_EVIDENCE_ANSWER
 
     @staticmethod
     def _default_instructions() -> str:
         return (
-            "You are a concise, accurate voice assistant powered by retrieved knowledge. "
-            "Answer the user's question directly and briefly based strictly on the provided context. "
-            f"If the context lacks sufficient evidence, respond: '{NO_EVIDENCE_ANSWER}' "
-            "Do not fabricate facts. Keep answers strictly to 1-2 concise sentences."
+            "You are a concise, accurate voice assistant. "
+            "Answer the user's question directly and briefly. "
+            "If the provided context contains relevant information, use it. "
+            "If the context lacks sufficient evidence, use your own vast general knowledge to answer the question. "
+            "Do not fabricate facts. Keep answers strictly to 1-2 concise sentences. "
+            "CRITICAL: Do NOT output any <think> tags or reasoning steps. Output ONLY the final answer."
         )
 
     @staticmethod
@@ -221,7 +267,7 @@ class LLMService:
         sections: list[str] = []
         used_chars = 0
 
-        for index, doc in enumerate(documents[:3], start=1):
+        for index, doc in enumerate(documents[:1], start=1):
             section = f"[Source {index}] (ID: {doc.id})\n{doc.text}\n"
             if used_chars + len(section) > max_context_chars:
                 remaining = max_context_chars - used_chars

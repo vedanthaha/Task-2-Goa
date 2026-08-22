@@ -87,6 +87,12 @@ async def health() -> HealthResponse:
     )
 
 
+@app.on_event("startup")
+async def startup_event() -> None:
+    from rag.orchestrator import orchestrator
+    logger.info("Running system warmup...")
+    await orchestrator.generator.llm_service.warmup()
+
 # Mount routers
 app.include_router(rag.router)
 app.include_router(voice.router)

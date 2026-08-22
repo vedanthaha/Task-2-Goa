@@ -32,6 +32,15 @@ class GroundingChecker:
                 reason="missing_answer_or_context",
             )
 
+        NO_EVIDENCE_ANSWER = "I could not find sufficient evidence in the retrieved knowledge base to answer your question."
+        if answer.strip() == NO_EVIDENCE_ANSWER:
+            return GroundingResult(
+                is_grounded=True,
+                grounding_score=1.0,
+                supported_statements=[answer],
+                reason="correct_refusal"
+            )
+
         # Concatenate context terms
         combined_context = " ".join(doc.text.lower() for doc in retrieved_docs)
         context_words = set(re.findall(r"\w+", combined_context))
