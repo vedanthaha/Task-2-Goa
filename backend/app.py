@@ -92,6 +92,7 @@ async def startup_event() -> None:
     from rag.orchestrator import orchestrator
     logger.info("Running system warmup...")
     await orchestrator.generator.llm_service.warmup()
+    await orchestrator.stt_service.warmup()
 
 # Mount routers
 app.include_router(rag.router)

@@ -34,6 +34,24 @@ class SarvamSTTService:
 
     def __init__(self, timeout_seconds: float = 20.0) -> None:
         self.timeout_seconds = timeout_seconds
+        limits = httpx.Limits(max_keepalive_connections=20, max_connections=50, keepalive_expiry=3600.0)
+        self._client = httpx.AsyncClient(limits=limits, timeout=self.timeout_seconds, http2=True)
+
+    async def close(self) -> None:
+        await self._client.aclose()
+
+    async def warmup(self) -> None:
+        """Pre-warms the HTTP connection to Sarvam API endpoint."""
+        settings = get_settings()
+        if not settings.sarvam_api_key:
+            return
+        
+        # Simple HEAD request to establish TLS/TCP connection in the pool
+        try:
+            await self._client.head(self.BASE_URL, timeout=2.0)
+            logger.info("Sarvam STT HTTP connection pool pre-warmed successfully.")
+        except Exception:
+            pass
 
     async def transcribe(
         self,
@@ -74,15 +92,14 @@ class SarvamSTTService:
         logger.info("Calling Sarvam STT: bytes=%d, mime=%s, model=%s, lang=%s", len(audio_content), mime_type, selected_model, lang)
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                response = await client.post(
-                    self.BASE_URL,
-                    headers=headers,
-                    data=data,
-                    files=files,
-                )
-                response.raise_for_status()
-                payload = response.json()
+            response = await self._client.post(
+                self.BASE_URL,
+                headers=headers,
+                data=data,
+                files=files,
+            )
+            response.raise_for_status()
+            payload = response.json()
         except httpx.HTTPStatusError as exc:
             error_detail = exc.response.text[:400] if exc.response else ""
             logger.error("Sarvam STT HTTP error: %s (%s)", exc, error_detail)

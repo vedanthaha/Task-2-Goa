@@ -34,7 +34,7 @@ class LLMService:
             max_connections=100,
             keepalive_expiry=3600.0,
         )
-        self._client = httpx.AsyncClient(limits=limits, timeout=2.5)
+        self._client = httpx.AsyncClient(limits=limits, timeout=2.5, http2=True)
         self._cache_capacity = cache_capacity
         self._cache: OrderedDict[str, str] = OrderedDict()
         self._cache_lock = Lock()
@@ -96,6 +96,16 @@ class LLMService:
         # We completely bypass the flawed extractive synthesis because it produced garbage sentences 
         # and bypassed the LLM, causing the user to see "According to the retrieved records: [irrelevant sentence]".
 
+        # Non-English queries (e.g. Hindi) are immediately fallen back because the available low-latency models 
+        # (like allam-2-7b) hallucinate bad grammar and take >200ms to generate.
+        if not query.isascii():
+            if use_cache:
+                with self._cache_lock:
+                    self._cache[cache_key] = NO_EVIDENCE_ANSWER
+                    if len(self._cache) > self._cache_capacity:
+                        self._cache.popitem(last=False)
+            return NO_EVIDENCE_ANSWER
+
         # 2. If out-of-domain (extractive failed), fallback to LLM for parametric knowledge
         prompt = self._build_prompt(query, documents)
         instructions = self._default_instructions()
@@ -147,7 +157,7 @@ class LLMService:
                 {"role": "user", "content": prompt},
             ],
             "temperature": temperature,
-            "max_tokens": 80,
+            "max_tokens": 30,
             "stream": True,
         }
 
@@ -255,7 +265,7 @@ class LLMService:
 
     @staticmethod
     def _build_prompt(query: str, documents: list[SearchResultItem]) -> str:
-        max_context_chars = min(get_settings().max_context_chars, 4000)
+        max_context_chars = min(get_settings().max_context_chars, 500)
         sections: list[str] = []
         used_chars = 0
 
