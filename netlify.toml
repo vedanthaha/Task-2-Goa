@@ -1,0 +1,8 @@
+[build]
+  # Tell Netlify to build the Next.js frontend
+  command = "npm run build"
+  # Next.js build output directory
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"

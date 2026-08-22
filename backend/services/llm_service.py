@@ -93,8 +93,15 @@ class LLMService:
                     self._cache.move_to_end(cache_key)
                     return self._cache[cache_key]
 
-        # We completely bypass the flawed extractive synthesis because it produced garbage sentences 
-        # and bypassed the LLM, causing the user to see "According to the retrieved records: [irrelevant sentence]".
+        # 1. Extractive Synthesis (Fast Path for < 200ms)
+        extractive_ans = self._synthesize_extractive_answer(query, documents)
+        if extractive_ans != NO_EVIDENCE_ANSWER:
+            if use_cache:
+                with self._cache_lock:
+                    self._cache[cache_key] = extractive_ans
+                    if len(self._cache) > self._cache_capacity:
+                        self._cache.popitem(last=False)
+            return extractive_ans
 
         # Non-English queries (e.g. Hindi) are immediately fallen back because the available low-latency models 
         # (like allam-2-7b) hallucinate bad grammar and take >200ms to generate.
@@ -242,10 +249,10 @@ class LLMService:
 
         if best_sentences:
             best_sentences.sort(key=lambda x: x[0], reverse=True)
-            if best_sentences[0][0] == 0:
+            if best_sentences[0][0] < 2:
                 return NO_EVIDENCE_ANSWER
                 
-            top_sents = [s for overlap, s in best_sentences[:2] if len(s) > 10 and overlap > 0]
+            top_sents = [s for overlap, s in best_sentences[:2] if len(s) > 10 and overlap >= 2]
             if top_sents:
                 combined = " ".join(top_sents)
                 return f"According to the retrieved records: {combined}"
